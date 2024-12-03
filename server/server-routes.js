@@ -1,73 +1,160 @@
-const _ = require('lodash');
-const todos = require('./database/todo-queries.js');
+const express = require('express')
+const router = express.Router()
+const queries = require('./database/db-queries')
 
-function createToDo(req, data) {
-  const protocol = req.protocol, 
-    host = req.get('host'), 
-    id = data.id;
-
-  return {
-    title: data.title,
-    order: data.order,
-    completed: data.completed || false,
-    url: `${protocol}://${host}/${id}`
-  };
-}
-
-async function getAllTodos(req, res) {
-  const allEntries = await todos.all();
-  return res.send(allEntries.map( _.curry(createToDo)(req) ));
-}
-
-async function getTodo(req, res) {
-  const todo = await todos.get(req.params.id);
-  return res.send(todo);
-}
-
-async function postTodo(req, res) {
-  const created = await todos.create(req.body.title, req.body.order);
-  return res.send(createToDo(req, created));
-}
-
-async function patchTodo(req, res) {
-  const patched = await todos.update(req.params.id, req.body);
-  return res.send(createToDo(req, patched));
-}
-
-async function deleteAllTodos(req, res) {
-  const deletedEntries = await todos.clear();
-  return res.send(deletedEntries.map( _.curry(createToDo)(req) ));
-}
-
-async function deleteTodo(req, res) {
-  const deleted = await todos.delete(req.params.id);
-  return res.send(createToDo(req, deleted));
-}
-
-function addErrorReporting(func, message) {
-    return async function(req, res) {
-        try {
-            return await func(req, res);
-        } catch(err) {
-            console.log(`${message} caused by: ${err}`);
-
-            // Not always 500, but for simplicity's sake.
-            res.status(500).send(`Opps! ${message}.`);
-        } 
+// User routes
+router.post('/users', async (req, res, next) => {
+    try {
+        const user = await queries.createUser(req.body)
+        res.status(201).json(user)
+    } catch (err) {
+        next(err)
     }
-}
+})
 
-const toExport = {
-    getAllTodos: { method: getAllTodos, errorMessage: "Could not fetch all todos" },
-    getTodo: { method: getTodo, errorMessage: "Could not fetch todo" },
-    postTodo: { method: postTodo, errorMessage: "Could not post todo" },
-    patchTodo: { method: patchTodo, errorMessage: "Could not patch todo" },
-    deleteAllTodos: { method: deleteAllTodos, errorMessage: "Could not delete all todos" },
-    deleteTodo: { method: deleteTodo, errorMessage: "Could not delete todo" }
-}
+router.get('/users/:id', async (req, res, next) => {
+    try {
+        const user = await queries.getUserById(req.params.id)
+        if (!user) return res.status(404).json({ error: 'User not found' })
+        res.json(user)
+    } catch (err) {
+        next(err)
+    }
+})
 
-for (let route in toExport) {
-    toExport[route] = addErrorReporting(toExport[route].method, toExport[route].errorMessage);
-}
+// Organization routes
+router.post('/organizations', async (req, res, next) => {
+    try {
+        const org = await queries.createOrg(req.body)
+        res.status(201).json(org)
+    } catch (err) {
+        next(err)
+    }
+})
 
-module.exports = toExport;
+router.get('/organizations/:id', async (req, res, next) => {
+    try {
+        const org = await queries.getOrgById(req.params.id)
+        if (!org) return res.status(404).json({ error: 'Organization not found' })
+        res.json(org)
+    } catch (err) {
+        next(err)
+    }
+})
+
+// Project routes
+router.post('/projects', async (req, res, next) => {
+    try {
+        const project = await queries.createProject(req.body)
+        res.status(201).json(project)
+    } catch (err) {
+        next(err)
+    }
+})
+
+router.get('/projects/org/:orgId', async (req, res, next) => {
+    try {
+        const projects = await queries.getProjectsByOrg(req.params.orgId)
+        res.json(projects)
+    } catch (err) {
+        next(err)
+    }
+})
+
+router.get('/projects/:id', async (req, res, next) => {
+    try {
+        const project = await queries.getProjectDetails(req.params.id)
+        if (!project) return res.status(404).json({ error: 'Project not found' })
+        res.json(project)
+    } catch (err) {
+        next(err)
+    }
+})
+
+// Task routes
+router.post('/tasks', async (req, res, next) => {
+    try {
+        const task = await queries.createTask(req.body)
+        res.status(201).json(task)
+    } catch (err) {
+        next(err)
+    }
+})
+
+router.get('/tasks/project/:projectId', async (req, res, next) => {
+    try {
+        const tasks = await queries.getTasksByProject(req.params.projectId)
+        res.json(tasks)
+    } catch (err) {
+        next(err)
+    }
+})
+
+router.get('/tasks/user/:userId', async (req, res, next) => {
+    try {
+        const tasks = await queries.getTasksAssignedToUser(req.params.userId)
+        res.json(tasks)
+    } catch (err) {
+        next(err)
+    }
+})
+
+router.patch('/tasks/:id/status', async (req, res, next) => {
+    try {
+        const task = await queries.updateTaskStatus(req.params.id, req.body.status)
+        if (!task) return res.status(404).json({ error: 'Task not found' })
+        res.json(task)
+    } catch (err) {
+        next(err)
+    }
+})
+
+router.get('/tasks/:id', async (req, res, next) => {
+    try {
+        const task = await queries.getTaskWithComments(req.params.id)
+        if (!task) return res.status(404).json({ error: 'Task not found' })
+        res.json(task)
+    } catch (err) {
+        next(err)
+    }
+})
+
+// Comment routes
+router.post('/comments', async (req, res, next) => {
+    try {
+        const comment = await queries.addComment(req.body)
+        res.status(201).json(comment)
+    } catch (err) {
+        next(err)
+    }
+})
+
+router.get('/comments/task/:taskId', async (req, res, next) => {
+    try {
+        const comments = await queries.getCommentsByTask(req.params.taskId)
+        res.json(comments)
+    } catch (err) {
+        next(err)
+    }
+})
+
+// Advanced routes
+router.get('/projects/:id/stats', async (req, res, next) => {
+    try {
+        const stats = await queries.getProjectStats(req.params.id)
+        res.json(stats)
+    } catch (err) {
+        next(err)
+    }
+})
+
+router.get('/tasks/search', async (req, res, next) => {
+    try {
+        const tasks = await queries.searchTasks(req.query)
+        res.json(tasks)
+    } catch (err) {
+        next(err)
+    }
+})
+
+module.exports = router

@@ -1,19 +1,35 @@
-const app = require('./server-config.js');
-const routes = require('./server-routes.js');
+const express = require('express')
+const configureServer = require('./server-config')
+const routes = require('./server-routes')
 
-const port = process.env.PORT || 5000;
+const app = express()
 
-app.get('/', routes.getAllTodos);
-app.get('/:id', routes.getTodo);
+// Configure server middleware
+configureServer(app)
 
-app.post('/', routes.postTodo);
-app.patch('/:id', routes.patchTodo);
+// Apply routes
+app.use('/api', routes)
 
-app.delete('/', routes.deleteAllTodos);
-app.delete('/:id', routes.deleteTodo);
+// Root route
+app.get('/', (req, res) => {
+    res.json({
+        message: 'Task Management API',
+        version: '1.0.0'
+    })
+})
 
-if (process.env.NODE_ENV !== 'test') {
-  app.listen(port, () => console.log(`Listening on port ${port}`));
-}
+// 404 handler
+app.use((req, res) => {
+    res.status(404).json({
+        error: 'Not Found',
+        message: 'The requested resource does not exist'
+    })
+})
 
-module.exports = app;
+const PORT = process.env.PORT || 3000
+
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`)
+})
+
+module.exports = app
